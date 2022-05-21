@@ -4,11 +4,15 @@ rules:
 1. live cell with 2 or 3 live neighbours survives. All other live cells die.
 2. dead cell with 3 live neighbours becomes alive. All other dead cells stay dead.
 """
-from utils import print_grid
+from random import randint
+import curses
+from time import sleep
 
 
-NUMBER_OF_ROWS = 15
-NUMBER_OF_COLUMNS = 25
+NUMBER_OF_ROWS = 20
+NUMBER_OF_COLUMNS = 20
+ALIVE_CHAR = '█'
+DEAD_CHAR = '.'
 
 
 class TickSpace:
@@ -109,10 +113,8 @@ class TickSpace:
             ts_row = list()
             for j in range(NUMBER_OF_COLUMNS):
                 if self.grid[i][j]:  # alive
-                    # print(self.grid[i][j], self.sum_space[i][j], alive[self.sum_space[i][j]])
                     ts_row.append(alive[self.sum_space[i][j]])
                 else:  # dead
-                    # print(self.grid[i][j], self.sum_space[i][j], dead[self.sum_space[i][j]])
                     ts_row.append(dead[self.sum_space[i][j]])
             ts.append(ts_row)
         return ts
@@ -124,40 +126,77 @@ class TickSpace:
             print()
 
 
-def ticks(grid, previous_grid, iteration):
+def print_grid(screen, grid, x_offset=1, y_offset=1):
+    i = 0
+    for row in grid:
+        j = 0
+        for cell in row:
+            if cell:  # alive
+                screen.addstr(i + y_offset, j + x_offset, ALIVE_CHAR)
+            else:
+                screen.addstr(i + y_offset, j + x_offset, DEAD_CHAR)
+            j += 1
+        i += 1
+    screen.refresh()
+
+
+def ticks(screen, grid, previous_grid, iteration):
     if grid == previous_grid:
         return True
-    print('====', iteration, '====')
-    print_grid(grid)
+
+    print_grid(screen, grid)
+    screen.addstr(0, 0, f'ticks: {iteration:8}')
     tick_space = TickSpace(grid)
-    # print('_'*3*NUMBER_OF_COLUMNS)
-    # tick_space.print_sum_space()
-    return ticks(tick_space.next_grid, grid, iteration + 1)
+    sleep(0.02)
+    return ticks(screen, tick_space.next_grid, grid, iteration + 1)
 
 
-def create_seed():
+def create_seed(pre_set=None):
     seed = list()
+
+    if 1 == pre_set:  # ever living when 15 rows and 25 columns
+        for i in range(NUMBER_OF_ROWS):
+            seed.append([0] * NUMBER_OF_COLUMNS)
+        seed[0][1] = 1
+        seed[2][0] = 1
+        seed[2][1] = 1
+        seed[2][2] = 1
+        seed[3] = [1] * NUMBER_OF_COLUMNS
+        return seed
+
+    if 2 == pre_set:  # dying set
+        for i in range(NUMBER_OF_ROWS):
+            seed.append([0]*NUMBER_OF_COLUMNS)
+        seed[1][1] = 1
+        seed[2][2] = 1
+        seed[3][1] = 1
+        return seed
+
     for i in range(NUMBER_OF_ROWS):
-        seed.append([0] * NUMBER_OF_COLUMNS)
-    seed[0][1] = 1
-    seed[2][0] = 1
-    seed[2][1] = 1
-    seed[2][2] = 1
-    seed[3] = [1] * NUMBER_OF_COLUMNS
+        current_row = []
+        for j in range(NUMBER_OF_COLUMNS):
+            current_row.append(randint(0, 1))
+        seed.append(current_row)
+
     return seed
-    # dying_seed = list()
-    # for i in range(NUMBER_OF_ROWS):
-    #     dying_seed.append([0]*NUMBER_OF_COLUMNS)
-    # dying_seed[1][1] = 1
-    # dying_seed[2][2] = 1
-    # dying_seed[3][1] = 1
-    # return dying_seed
 
 
-def main():
-    seed = create_seed()
-    ticks(seed, None, 0)
+def main(stdscr):
+    # assert that terminal window has sufficient lines and columns to draw the grid
+    assert curses.LINES > NUMBER_OF_ROWS + 1, 'Too many game-of-life rows to show in terminal'
+    assert curses.COLS > NUMBER_OF_COLUMNS + 1, 'Too many game-of-life columns to show in terminal'
+
+    curses.curs_set(False)  # Do not blink the cursor
+    input_key = 'y'
+    while input_key == 'y':
+        stdscr.clear()
+        ticks(stdscr, grid, None, 0)
+        stdscr.addstr(NUMBER_OF_ROWS + 1, 0, 'Press `y` to run again.')
+        input_key = stdscr.getkey()
+        if not input_key == 'y':
+            break
 
 
 if __name__ == '__main__':
-    main()
+    grid = create_seed()
+    curses.wrapper(main)
